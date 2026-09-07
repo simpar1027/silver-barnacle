@@ -9,6 +9,9 @@ if not TOKEN:
 
 bot = telebot.TeleBot(TOKEN)
 
+# Запоминаем выбранный формат для каждого пользователя
+user_formats = {}
+
 
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -33,73 +36,170 @@ def start(message):
     )
 
 
-@bot.message_handler(func=lambda message: True)
-def menu(message):
-    if message.text == "📸 Код изображения":
-        bot.reply_to(message, "📸 Отправь мне изображение.")
+# Выбор формата кода
+@bot.message_handler(func=lambda message: message.text == "💻 Формат кода")
+def choose_format(message):
+    keyboard = types.InlineKeyboardMarkup()
 
-    elif message.text == "✂️ Убрать фон":
-        bot.reply_to(
-            message,
-            "✂️ Отправь изображение, у которого нужно убрать фон."
+    keyboard.add(
+        types.InlineKeyboardButton(
+            "HTML",
+            callback_data="format_html"
+        ),
+        types.InlineKeyboardButton(
+            "CSS",
+            callback_data="format_css"
         )
+    )
 
-    elif message.text == "🔗 Получить ссылку":
-        bot.reply_to(
-            message,
-            "🔗 Отправь изображение, и я подготовлю ссылку."
+    keyboard.add(
+        types.InlineKeyboardButton(
+            "Markdown",
+            callback_data="format_markdown"
         )
+    )
 
-    elif message.text == "💻 Формат кода":
-        keyboard = types.InlineKeyboardMarkup()
-
-        keyboard.add(
-            types.InlineKeyboardButton("HTML", callback_data="html"),
-            types.InlineKeyboardButton("CSS", callback_data="css")
-        )
-
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "Markdown",
-                callback_data="markdown"
-            )
-        )
-
-        bot.send_message(
-            message.chat.id,
-            "💻 Выбери формат:",
-            reply_markup=keyboard
-        )
-
-    elif message.text == "❓ Помощь":
-        bot.reply_to(
-            message,
-            """❓ Помощь
-
-📸 Код изображения — получить готовый код.
-✂️ Убрать фон — обработать изображение.
-🔗 Получить ссылку — получить ссылку.
-💻 Формат кода — выбрать HTML, CSS или Markdown."""
-        )
+    bot.send_message(
+        message.chat.id,
+        "💻 Выбери формат кода:",
+        reply_markup=keyboard
+    )
 
 
-@bot.callback_query_handler(func=lambda call: True)
-def callbacks(call):
-    formats = {
+# Обработка выбора формата
+@bot.callback_query_handler(
+    func=lambda call: call.data.startswith("format_")
+)
+def format_callback(call):
+    format_name = call.data.replace("format_", "")
+
+    user_formats[call.from_user.id] = format_name
+
+    names = {
         "html": "HTML",
         "css": "CSS",
         "markdown": "Markdown"
     }
 
-    if call.data in formats:
-        bot.answer_callback_query(call.id)
+    bot.answer_callback_query(call.id)
 
+    bot.send_message(
+        call.message.chat.id,
+        f"✅ Формат выбран: {names[format_name]}\n\n"
+        "Теперь отправь мне фотографию 📸"
+    )
+
+
+# Получение фотографии
+@bot.message_handler(content_types=["photo"])
+def handle_photo(message):
+    try:
+        # Получаем файл Telegram
+        file_info = bot.get_file(message.photo[-1].file_id)
+
+        # Ссылка на файл Telegram
+        file_url = (
+            f"https://api.telegram.org/file/bot"
+            f"{TOKEN}/{file_info.file_path}"
+        )
+
+        # Узнаём выбранный формат
+        selected_format = user_formats.get(
+            message.from_user.id,
+            "html"
+        )
+
+        # Создаём код
+        if selected_format == "html":
+            code = f'<img src="{file_url}" alt="Фото">'
+
+        elif selected_format == "css":
+            code = f'background-image: url("{file_url}");'
+
+        else:
+            code = f"![Фото]({file_url})"
+
+        # Отправляем фото обратно
+        bot.send_photo(
+            message.chat.id,
+            message.photo[-1].file_id,
+            caption="🖼️ Фото получено!"
+        )
+
+        # Отправляем результат
         bot.send_message(
-            call.message.chat.id,
-            f"✅ Выбран формат: {formats[call.data]}"
+            message.chat.id,
+            f"""🔗 Ссылка на изображение:
+
+{file_url}
+
+💻 Код ({selected_format.upper()}):
+
+{code}"""
+        )
+
+    except Exception as error:
+        bot.send_message(
+            message.chat.id,
+            f"❌ Ошибка при обработке изображения:\n\n{error}"
         )
 
 
-print("порнуха запущена!")
+# Кнопка "Код изображения"
+@bot.message_handler(
+    func=lambda message: message.text == "📸 Код изображения"
+)
+def image_code(message):
+    bot.send_message(
+        message.chat.id,
+        "📸 Отправь мне фотографию.\n\n"
+        "По умолчанию я подготовлю HTML-код."
+    )
+
+
+# Кнопка "Получить ссылку"
+@bot.message_handler(
+    func=lambda message: message.text == "🔗 Получить ссылку"
+)
+def get_link(message):
+    bot.send_message(
+        message.chat.id,
+        "🔗 Отправь фотографию, и я дам ссылку на неё."
+    )
+
+
+# Кнопка "Убрать фон"
+@bot.message_handler(
+    func=lambda message: message.text == "✂️ Убрать фон"
+)
+def remove_background(message):
+    bot.send_message(
+        message.chat.id,
+        "✂️ Функцию удаления фона добавим следующим этапом."
+    )
+
+
+# Помощь
+@bot.message_handler(
+    func=lambda message: message.text == "❓ Помощь"
+)
+def help_message(message):
+    bot.send_message(
+        message.chat.id,
+        """❓ Помощь
+
+📸 Код изображения — получить код изображения.
+
+🔗 Получить ссылку — получить ссылку на изображение.
+
+💻 Формат кода — выбрать HTML, CSS или Markdown.
+
+✂️ Убрать фон — удалить фон изображения.
+
+После выбора формата просто отправь фотографию 📸"""
+    )
+
+
+print("67! ГАЗАН! ЕГОР ГЕЙ!")
 
 bot.infinity_polling()
