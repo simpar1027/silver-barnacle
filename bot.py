@@ -1,16 +1,14 @@
+import os
 import telebot
-from telebot import types
 
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = os.getenv("BOT_TOKEN")
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN не найден в Railway")
 
 bot = telebot.TeleBot(TOKEN)
-
-
-@bot.message_handler(commands=["start"])
-def start(message):
-    keyboard = types.ReplyKeyboardMarkup(
-        resize_keyboard=True
-    )
+    
+)
 
     keyboard.add("📸 Код изображения")
     keyboard.add("✂️ Убрать фон")
