@@ -1,5 +1,6 @@
 import os
 import telebot
+from telebot import types
 
 TOKEN = os.getenv("BOT_TOKEN")
 
@@ -7,8 +8,11 @@ if not TOKEN:
     raise ValueError("BOT_TOKEN не найден в Railway")
 
 bot = telebot.TeleBot(TOKEN)
-    
-)
+
+
+@bot.message_handler(commands=["start"])
+def start(message):
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
 
     keyboard.add("📸 Код изображения")
     keyboard.add("✂️ Убрать фон")
@@ -32,10 +36,7 @@ bot = telebot.TeleBot(TOKEN)
 @bot.message_handler(func=lambda message: True)
 def menu(message):
     if message.text == "📸 Код изображения":
-        bot.reply_to(
-            message,
-            "📸 Отправь мне изображение."
-        )
+        bot.reply_to(message, "📸 Отправь мне изображение.")
 
     elif message.text == "✂️ Убрать фон":
         bot.reply_to(
@@ -51,12 +52,17 @@ def menu(message):
 
     elif message.text == "💻 Формат кода":
         keyboard = types.InlineKeyboardMarkup()
+
         keyboard.add(
             types.InlineKeyboardButton("HTML", callback_data="html"),
             types.InlineKeyboardButton("CSS", callback_data="css")
         )
+
         keyboard.add(
-            types.InlineKeyboardButton("Markdown", callback_data="markdown")
+            types.InlineKeyboardButton(
+                "Markdown",
+                callback_data="markdown"
+            )
         )
 
         bot.send_message(
@@ -87,12 +93,13 @@ def callbacks(call):
 
     if call.data in formats:
         bot.answer_callback_query(call.id)
+
         bot.send_message(
             call.message.chat.id,
             f"✅ Выбран формат: {formats[call.data]}"
         )
 
 
-print("ImageCodeBot запущен!")
+print("порнуха запущена!")
 
 bot.infinity_polling()
